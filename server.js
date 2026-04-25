@@ -10,6 +10,9 @@ app.use(cors());
 // Increase JSON payload limit to handle large base64 images
 app.use(express.json({ limit: '10mb' }));
 
+// Serve static files from the current directory
+app.use(express.static(__dirname));
+
 app.post('/api/llm', async (req, res) => {
     try {
         const { provider, apiKey, baseUrl, model, messages, useJson } = req.body;
@@ -73,7 +76,11 @@ app.post('/api/llm', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Backend proxy server running at http://localhost:${port}`);
-    console.log(`Send POST requests to http://localhost:${port}/api/llm`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(port, () => {
+        console.log(`Backend proxy server running at http://localhost:${port}`);
+        console.log(`Send POST requests to http://localhost:${port}/api/llm`);
+    });
+}
+
+module.exports = app;

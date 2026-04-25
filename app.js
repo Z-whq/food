@@ -486,7 +486,7 @@ createApp({
             const model = modelMap[userSettings.value.aiProvider] || 'gpt-4o';
 
             // Forward the request to our local Node.js proxy server
-            const proxyUrl = 'http://localhost:3000/api/llm';
+            const proxyUrl = '/api/llm';
 
             try {
                 const response = await fetch(proxyUrl, {
