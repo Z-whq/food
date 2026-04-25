@@ -1,0 +1,384 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Caffè Log - 手账式饮品记录</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- SheetJS (xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Hand-drawn style -->
+        <link rel="stylesheet" href="style.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        theme: {
+                            pink: '#F3D8C3',
+                            blue: '#6090B8',
+                            white: '#FFFFFF',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-theme-pink/40 text-theme-blue">
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-theme-white shadow-lg relative pb-16 overflow-hidden flex flex-col">
+        
+        <!-- Header -->
+        <header class="p-4 border-b-2 border-dashed border-theme-blue bg-theme-pink flex justify-between items-center z-10 relative">
+            <h1 class="text-2xl font-bold text-theme-blue"><i class="fa-solid fa-mug-hot mr-2"></i>Caffè Log</h1>
+            <div class="text-sm font-bold text-theme-blue">{{ currentDate }}</div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow overflow-y-auto p-4 bg-[url('https://www.transparenttextures.com/patterns/notebook.png')]">
+            
+            <!-- View: Dashboard (Home) -->
+            <div v-show="currentTab === 'home'" class="space-y-6">
+                <div class="hand-drawn-border bg-theme-white shadow-sm relative">
+                    <h2 class="text-lg font-bold text-theme-blue mb-2"><i class="fa-solid fa-chart-line mr-2"></i>今日咖啡因代谢曲线</h2>
+                    <div id="chart-container" class="w-full h-64"></div>
+                    <div v-if="warningMessage" class="absolute top-2 right-2 bg-theme-pink/80 text-theme-blue text-xs px-2 py-1 rounded-full border border-theme-blue/50 shadow-sm animate-pulse">
+                        {{ warningMessage }}
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <div class="flex-1 hand-drawn-border text-center bg-theme-pink/60">
+                        <div class="text-xs text-theme-blue/60">今日总热量</div>
+                        <div class="text-xl font-bold text-theme-blue">{{ todayStats.kcal }} <span class="text-xs font-normal">kcal</span></div>
+                    </div>
+                    <div class="flex-1 hand-drawn-border text-center" :class="todayStats.caffeine > 400 ? 'bg-theme-pink/80' : 'bg-theme-pink/40'">
+                        <div class="text-xs text-theme-blue/60">今日总咖啡因</div>
+                        <div class="text-xl font-bold" :class="todayStats.caffeine > 400 ? 'text-theme-blue' : 'text-theme-blue/90'">{{ todayStats.caffeine.toFixed(1) }} <span class="text-xs font-normal">mg</span></div>
+                    </div>
+                </div>
+
+                <button @click="openRecordModal" class="w-full py-3 bg-theme-blue text-theme-white font-bold rounded-xl shadow-md active:scale-95 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-pen"></i> 记录一杯饮品
+                </button>
+
+                <!-- Today's Records List -->
+                <div class="mt-6" v-if="todayRecords.length > 0">
+                    <h3 class="font-bold text-theme-blue mb-3 text-lg">今日记录</h3>
+                    <div class="space-y-3">
+                        <div v-for="(record, index) in todayRecords" :key="record.id" class="hand-drawn-border flex items-center justify-between bg-theme-white/80">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-theme-pink flex items-center justify-center text-theme-blue text-lg border border-theme-blue/50">
+                                    <i :class="record.type === '咖啡' ? 'fa-solid fa-coffee' : 'fa-solid fa-glass-water'"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold">{{ record.brand }} - {{ record.name }}</div>
+                                    <div class="text-xs text-theme-blue/60">{{ record.time }} | {{ record.cupSizeLabel }} | {{ record.sugarLabel }}</div>
+                                </div>
+                            </div>
+                            <div class="text-right text-sm">
+                                <div class="text-theme-blue/90 font-bold">{{ record.caffeine.toFixed(0) }}mg</div>
+                                <div class="text-theme-blue">{{ record.kcal.toFixed(0) }}kcal</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Statistics & Calendar -->
+            <div v-show="currentTab === 'stats'" class="space-y-6">
+                <div class="hand-drawn-border bg-theme-white text-center p-4">
+                    <h2 class="text-lg font-bold text-theme-blue mb-4">手账日历</h2>
+                    <!-- Simple Calendar Grid -->
+                    <div class="grid grid-cols-7 gap-1 text-sm mb-2">
+                        <div v-for="day in ['日','一','二','三','四','五','六']" :key="day" class="font-bold text-theme-blue">{{ day }}</div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1">
+                        <div v-for="blank in calendarBlanks" :key="'blank-'+blank" class="p-2"></div>
+                        <div v-for="day in calendarDays" :key="'day-'+day.date" 
+                             @click="showDayStats(day)"
+                             class="p-2 border rounded-lg cursor-pointer flex flex-col items-center justify-center aspect-square relative"
+                             :class="getDayClass(day)">
+                            <span class="font-bold">{{ day.dateNum }}</span>
+                            <div class="text-xs mt-1" v-if="day.records.length > 0">
+                                <i class="fa-solid fa-mug-hot"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button @click="exportData" class="flex-1 py-2 hand-drawn-btn text-sm font-bold text-theme-blue"><i class="fa-solid fa-download"></i> 导出记录</button>
+                    <button @click="clearData" class="flex-1 py-2 hand-drawn-btn text-sm font-bold text-theme-blue"><i class="fa-solid fa-trash"></i> 清空记录</button>
+                </div>
+
+                <div class="hand-drawn-border bg-theme-white text-center p-4 mt-6">
+                    <h2 class="text-lg font-bold text-theme-blue mb-4"><i class="fa-solid fa-file-excel"></i> 饮品热量数据源配置</h2>
+                    <p class="text-xs text-theme-blue/60 mb-4">网页的热量和咖啡因计算，将完全由您上传的 Excel 决定。您可以下载模板，修改数值后重新上传生效。</p>
+                    <div class="flex flex-col gap-3">
+                        <button @click="exportExcelDB" class="w-full py-2 hand-drawn-btn text-sm font-bold text-theme-blue bg-theme-pink/40">
+                            <i class="fa-solid fa-download text-theme-blue"></i> 下载 Excel 配置模板
+                        </button>
+                        <div class="relative">
+                            <input type="file" id="import-excel-input" accept=".xlsx, .xls" @change="importExcelDB" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <button class="w-full py-2 hand-drawn-btn text-sm font-bold text-theme-blue bg-theme-pink/40 pointer-events-none">
+                                <i class="fa-solid fa-upload text-theme-blue"></i> 上传自定义的 Excel 配置文件
+                            </button>
+                        </div>
+                        <button @click="resetDB" class="w-full py-2 hand-drawn-btn text-sm font-bold text-theme-blue/60 mt-2 border-none shadow-none bg-transparent underline">
+                            恢复默认数据源
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: AI Advisor -->
+            <div v-show="currentTab === 'ai'" class="space-y-6">
+                <div class="hand-drawn-border bg-theme-white shadow-sm relative p-4">
+                    <h2 class="text-lg font-bold text-theme-blue mb-2"><i class="fa-solid fa-user-doctor mr-2"></i>AI 营养师点评</h2>
+                    <p class="text-sm text-theme-blue/70 mb-4" v-if="!aiAdvice">正在根据您的今日摄入与个人偏好生成专属建议...</p>
+                    <div class="text-sm text-theme-blue whitespace-pre-wrap leading-relaxed" v-html="aiAdvice" v-else></div>
+                    <button @click="generateAIAdvice" :disabled="isGeneratingAdvice" class="mt-4 w-full py-2 bg-theme-blue/20 text-theme-blue font-bold rounded-xl shadow-sm border border-theme-blue/50 active:scale-95 transition disabled:opacity-50">
+                        <i class="fa-solid fa-arrows-rotate" :class="{'fa-spin': isGeneratingAdvice}"></i> 重新生成建议
+                    </button>
+                </div>
+
+                <div class="hand-drawn-border bg-theme-white shadow-sm relative p-4">
+                    <h2 class="text-lg font-bold text-theme-blue mb-2"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>反向生成隐藏菜单</h2>
+                    <p class="text-sm text-theme-blue/70 mb-4">嘴馋但怕胖？告诉我你想喝什么口味，AI为你定制低卡/低咖啡因的点单话术。</p>
+                    <input type="text" v-model="aiMenuPrompt" placeholder="例如：我想喝杯奶茶，但要低卡的" class="w-full hand-drawn-btn p-2 text-sm mb-3 outline-none">
+                    <button @click="generateSecretMenu" :disabled="isGeneratingMenu || !aiMenuPrompt" class="w-full py-2 bg-theme-blue text-theme-white font-bold rounded-xl shadow-sm active:scale-95 transition disabled:opacity-50">
+                        <i class="fa-solid fa-wand-sparkles" :class="{'fa-bounce': isGeneratingMenu}"></i> 生成点单话术
+                    </button>
+                    <div v-if="aiMenuResult" class="mt-4 p-3 bg-theme-pink/40 border border-theme-blue/30 rounded-lg text-sm text-theme-blue whitespace-pre-wrap">
+                        {{ aiMenuResult }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Settings -->
+            <div v-show="currentTab === 'settings'" class="space-y-6">
+                <div class="hand-drawn-border bg-theme-white p-4">
+                    <h2 class="text-lg font-bold text-theme-blue mb-4"><i class="fa-solid fa-key mr-2"></i>AI 引擎设置</h2>
+                    <div class="space-y-3 text-sm">
+                        <div>
+                            <label class="block font-bold text-theme-blue mb-1">模型提供商</label>
+                            <select v-model="userSettings.aiProvider" class="w-full hand-drawn-btn p-2 outline-none bg-transparent">
+                                <option value="openai">OpenAI (GPT-4o)</option>
+                                <option value="gemini">Google (Gemini 1.5 Pro)</option>
+                                <option value="qwen">阿里通义千问 (Qwen-VL)</option>
+                                <option value="deepseek">DeepSeek (V3/R1)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-theme-blue mb-1">API Key</label>
+                            <input type="password" v-model="userSettings.apiKey" placeholder="输入您的 API Key" class="w-full hand-drawn-btn p-2 outline-none bg-transparent">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-theme-blue mb-1">Base URL (可选, 用于代理)</label>
+                            <input type="text" v-model="userSettings.baseUrl" placeholder="https://api.openai.com/v1" class="w-full hand-drawn-btn p-2 outline-none bg-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hand-drawn-border bg-theme-white p-4">
+                    <h2 class="text-lg font-bold text-theme-blue mb-4"><i class="fa-solid fa-user mr-2"></i>个人偏好画像</h2>
+                    <div class="space-y-3 text-sm">
+                        <div>
+                            <label class="block font-bold text-theme-blue mb-1">当前目标</label>
+                            <div class="flex gap-2">
+                                <button v-for="goal in ['减脂期', '增肌期', '维持健康']" :key="goal"
+                                        @click="userSettings.goal = goal"
+                                        class="hand-drawn-btn flex-1 py-1"
+                                        :class="{'bg-theme-blue/20 font-bold': userSettings.goal === goal}">
+                                    {{ goal }}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-theme-blue mb-1">日常偏好口味</label>
+                            <input type="text" v-model="userSettings.tastePreference" placeholder="例如：喜欢清淡、爱喝果茶、不爱吃苦..." class="w-full hand-drawn-btn p-2 outline-none bg-transparent">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="absolute bottom-0 w-full bg-theme-pink border-t-2 border-dashed border-theme-blue flex text-xs">
+            <button @click="currentTab = 'home'" class="flex-1 py-2 text-center transition" :class="currentTab === 'home' ? 'text-theme-blue font-bold bg-theme-blue/20' : 'text-theme-blue/90'">
+                <i class="fa-solid fa-house block text-xl mb-1"></i> 首页
+            </button>
+            <button @click="currentTab = 'stats'" class="flex-1 py-2 text-center transition" :class="currentTab === 'stats' ? 'text-theme-blue font-bold bg-theme-blue/20' : 'text-theme-blue/90'">
+                <i class="fa-solid fa-calendar-days block text-xl mb-1"></i> 统计
+            </button>
+            <button @click="currentTab = 'ai'" class="flex-1 py-2 text-center transition relative" :class="currentTab === 'ai' ? 'text-theme-blue font-bold bg-theme-blue/20' : 'text-theme-blue/90'">
+                <i class="fa-solid fa-robot block text-xl mb-1"></i> AI参谋
+                <span class="absolute top-1 right-2 w-2 h-2 bg-theme-blue rounded-full animate-ping"></span>
+            </button>
+            <button @click="currentTab = 'settings'" class="flex-1 py-2 text-center transition" :class="currentTab === 'settings' ? 'text-theme-blue font-bold bg-theme-blue/20' : 'text-theme-blue/90'">
+                <i class="fa-solid fa-gear block text-xl mb-1"></i> 设置
+            </button>
+        </nav>
+
+        <!-- Record Modal -->
+        <div v-if="isRecordModalOpen" class="fixed inset-0 bg-theme-blue/50 z-50 flex items-end sm:items-center justify-center">
+            <div class="bg-theme-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl h-[85vh] sm:h-[80vh] flex flex-col border-t-4 sm:border-4 border-theme-blue shadow-2xl animate-slide-up">
+                <div class="p-4 border-b-2 border-dashed border-theme-blue flex justify-between items-center bg-theme-pink rounded-t-3xl sm:rounded-t-2xl">
+                    <h3 class="font-bold text-lg text-theme-blue">记录饮品</h3>
+                    <div class="flex items-center gap-3">
+                        <label class="cursor-pointer text-theme-blue/90 bg-theme-blue/20 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1 active:scale-95 transition">
+                            <i class="fa-solid fa-camera"></i> 拍照即记
+                            <input type="file" accept="image/*" capture="environment" @change="handleSnapAndTrack" class="hidden">
+                        </label>
+                        <button @click="closeRecordModal" class="text-theme-blue text-xl"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto p-4 space-y-6 relative">
+                    <!-- Snap Loading Overlay -->
+                    <div v-if="isSnapping" class="absolute inset-0 bg-theme-white/80 z-10 flex flex-col items-center justify-center backdrop-blur-sm">
+                        <i class="fa-solid fa-spinner fa-spin text-4xl text-theme-blue mb-4"></i>
+                        <p class="text-theme-blue font-bold">AI正在识别小票/图片...</p>
+                    </div>
+                    <!-- Brand -->
+                    <div>
+                        <label class="block font-bold text-theme-blue mb-2">品牌</label>
+                        <div class="grid grid-cols-4 gap-2 pb-2">
+                            <button v-for="brand in db.brands" :key="brand" 
+                                    @click="selectBrand(brand)"
+                                    class="hand-drawn-btn px-2 py-2 text-sm text-center truncate"
+                                    :class="{ 'active': newRecord.brand === brand }">
+                                {{ brand }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Drink Selection -->
+                    <div>
+                        <label class="block font-bold text-theme-blue mb-2">饮品类型</label>
+                        <div v-if="availableDrinks.length > 0" class="grid grid-cols-3 gap-2 mb-3">
+                            <button v-for="drink in availableDrinks" :key="drink.id"
+                                    @click="selectDrink(drink)"
+                                    class="hand-drawn-btn p-2 text-sm text-center"
+                                    :class="{ 'active': newRecord.drinkId === drink.id }">
+                                {{ drink.name }}
+                            </button>
+                        </div>
+                        
+                        <!-- AI Auto Sync Custom Drink -->
+                        <div class="relative">
+                            <input type="text" v-model="aiSearchQuery" @keyup.enter="searchNewDrink" placeholder="库里没有？输入名称如“瑞幸 橘金气泡美式”..." class="w-full hand-drawn-btn p-2 text-sm outline-none pr-10">
+                            <button @click="searchNewDrink" :disabled="isSearchingDrink" class="absolute right-2 top-2 text-theme-blue/90 disabled:opacity-50">
+                                <i class="fa-solid fa-magnifying-glass" :class="{'fa-spin': isSearchingDrink}"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Specs -->
+                    <div v-if="newRecord.drinkId" class="space-y-4 p-4 hand-drawn-border bg-theme-white">
+                        <!-- Cup Size -->
+                        <div>
+                            <label class="block text-sm font-bold text-theme-blue mb-2">杯型</label>
+                            <div class="flex gap-2">
+                                <button v-for="size in availableCupSizes" :key="size.label"
+                                        @click="newRecord.cupSize = size.ratio !== undefined ? size.ratio : size.value; newRecord.cupSizeLabel = size.label"
+                                        class="hand-drawn-btn flex-1 py-1 text-sm flex flex-col items-center justify-center"
+                                        :class="{ 'active': newRecord.cupSizeLabel === size.label }">
+                                    <span>{{ size.label }}</span>
+                                    <span class="text-[10px] font-normal opacity-80" v-if="size.volume">{{ size.volume }}ml</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Temperature -->
+                        <div>
+                            <label class="block text-sm font-bold text-theme-blue mb-2">温度</label>
+                            <div class="flex gap-2">
+                                <button v-for="temp in db.temperatures" :key="temp"
+                                        @click="newRecord.temperature = temp"
+                                        class="hand-drawn-btn flex-1 py-1 text-sm"
+                                        :class="{ 'active': newRecord.temperature === temp }">
+                                    {{ temp }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sugar -->
+                        <div>
+                            <label class="block text-sm font-bold text-theme-blue mb-2">糖度</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button v-for="sugar in db.sugarLevels" :key="sugar.label"
+                                        @click="newRecord.sugar = sugar.value; newRecord.sugarLabel = sugar.label"
+                                        class="hand-drawn-btn px-3 py-1 text-sm"
+                                        :class="{ 'active': newRecord.sugarLabel === sugar.label }">
+                                    {{ sugar.label }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Toppings (Only for non-coffee if we want, or just show all) -->
+                        <div>
+                            <label class="block text-sm font-bold text-theme-blue mb-2">小料 (多选)</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button v-for="topping in db.toppings" :key="topping.label"
+                                        @click="toggleTopping(topping)"
+                                        class="hand-drawn-btn px-3 py-1 text-sm"
+                                        :class="{ 'active': newRecord.toppings.includes(topping.label) }">
+                                    {{ topping.label }}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Time -->
+                        <div>
+                            <label class="block text-sm font-bold text-theme-blue mb-2">摄入时间</label>
+                            <input type="time" v-model="newRecord.time" class="hand-drawn-btn w-full p-2 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Action -->
+                <div class="p-4 border-t-2 border-dashed border-theme-blue bg-theme-white rounded-b-3xl sm:rounded-b-2xl">
+                    <button @click="saveRecord" :disabled="!newRecord.drinkId" 
+                            class="w-full py-3 bg-green-600 text-theme-white font-bold rounded-xl shadow-md active:scale-95 transition disabled:opacity-50 disabled:active:scale-100">
+                        确认记录
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Day Stats Modal -->
+        <div v-if="selectedDayStats" class="fixed inset-0 bg-theme-blue/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-theme-white w-full max-w-sm rounded-2xl p-6 hand-drawn-border shadow-2xl relative">
+                <button @click="selectedDayStats = null" class="absolute top-4 right-4 text-theme-blue text-xl"><i class="fa-solid fa-xmark"></i></button>
+                <h3 class="font-bold text-xl text-theme-blue mb-4">{{ selectedDayStats.date }} 数据</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center border-b border-dashed border-theme-blue/30 pb-2">
+                        <span class="text-theme-blue/70">总热量</span>
+                        <span class="font-bold text-theme-blue text-lg">{{ selectedDayStats.kcal.toFixed(0) }} kcal</span>
+                    </div>
+                    <div class="flex justify-between items-center border-b border-dashed border-theme-blue/30 pb-2">
+                        <span class="text-theme-blue/70">总咖啡因</span>
+                        <span class="font-bold text-theme-blue/90 text-lg">{{ selectedDayStats.caffeine.toFixed(0) }} mg</span>
+                    </div>
+                    <div class="bg-theme-pink/40 p-3 rounded-lg text-sm text-theme-blue mt-4">
+                        <i class="fa-solid fa-person-running mr-2"></i> 相当于需要慢跑约 <strong>{{ (selectedDayStats.kcal / 10).toFixed(0) }}</strong> 分钟消耗掉热量。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

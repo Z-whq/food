@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>生成 Excel 数据库</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>正在生成 db.xlsx ...</h1>
+    <p>如果下载没有自动开始，请点击下方按钮：</p>
+    <button id="downloadBtn">下载 db.xlsx</button>
+
+    <script>
+        const DEFAULT_DB = {
+            brands: ['星巴克', '瑞幸', 'Manner', 'Tims', '一点点', '喜茶', '奈雪', '霸王茶姬', '自定义'],
+            drinks: [
+                { id: 1, brand: '瑞幸', name: '标准美式', type: '咖啡', baseCaffeine: 150, baseKcal: 15, sugarFactor: 0 },
+                { id: 2, brand: '瑞幸', name: '标准拿铁', type: '咖啡', baseCaffeine: 150, baseKcal: 180, sugarFactor: 0 },
+                { id: 3, brand: '星巴克', name: '星冰乐', type: '咖啡', baseCaffeine: 100, baseKcal: 300, sugarFactor: 50 },
+                { id: 4, brand: '一点点', name: '冰淇淋红茶', type: '奶茶', baseCaffeine: 50, baseKcal: 280, sugarFactor: 40 },
+                { id: 5, brand: '喜茶', name: '多肉葡萄', type: '奶茶', baseCaffeine: 40, baseKcal: 200, sugarFactor: 60 },
+                { id: 6, brand: '霸王茶姬', name: '伯牙绝弦', type: '奶茶', baseCaffeine: 130, baseKcal: 180, sugarFactor: 50 },
+                { id: 7, brand: 'Manner', name: '澳瑞白', type: '咖啡', baseCaffeine: 160, baseKcal: 120, sugarFactor: 0 },
+                { id: 8, brand: '自定义', name: '自制咖啡', type: '咖啡', baseCaffeine: 100, baseKcal: 50, sugarFactor: 0 },
+                { id: 9, brand: '自定义', name: '自制奶茶', type: '奶茶', baseCaffeine: 50, baseKcal: 200, sugarFactor: 50 }
+            ],
+            sugarLevels: [
+                { label: '无糖', value: 0 },
+                { label: '三分糖', value: 0.3 },
+                { label: '五分糖', value: 0.5 },
+                { label: '七分糖', value: 0.7 },
+                { label: '全糖', value: 1.0 }
+            ],
+            cupSizes: [
+                { label: '中杯', value: 0.8 },
+                { label: '大杯', value: 1.0 },
+                { label: '超大杯', value: 1.2 }
+            ],
+            temperatures: ['冰', '热', '常温'],
+            toppings: [
+                { label: '珍珠', kcal: 150 },
+                { label: '椰果', kcal: 80 },
+                { label: '布丁', kcal: 100 },
+                { label: '仙草', kcal: 50 },
+                { label: '奶盖', kcal: 200 }
+            ]
+        };
+
+        function generateExcel() {
+            const wb = XLSX.utils.book_new();
+
+            const brandsSheet = XLSX.utils.json_to_sheet(DEFAULT_DB.brands.map(b => ({ name: b })));
+            XLSX.utils.book_append_sheet(wb, brandsSheet, "brands");
+
+            const drinksSheet = XLSX.utils.json_to_sheet(DEFAULT_DB.drinks);
+            XLSX.utils.book_append_sheet(wb, drinksSheet, "drinks");
+
+            const sugarLevelsSheet = XLSX.utils.json_to_sheet(DEFAULT_DB.sugarLevels);
+            XLSX.utils.book_append_sheet(wb, sugarLevelsSheet, "sugarLevels");
+
+            const cupSizesSheet = XLSX.utils.json_to_sheet(DEFAULT_DB.cupSizes);
+            XLSX.utils.book_append_sheet(wb, cupSizesSheet, "cupSizes");
+
+            const tempSheet = XLSX.utils.json_to_sheet(DEFAULT_DB.temperatures.map(t => ({ name: t })));
+            XLSX.utils.book_append_sheet(wb, tempSheet, "temperatures");
+
+            const toppingsSheet = XLSX.utils.json_to_sheet(DEFAULT_DB.toppings);
+            XLSX.utils.book_append_sheet(wb, toppingsSheet, "toppings");
+
+            XLSX.writeFile(wb, "db.xlsx");
+        }
+
+        document.getElementById('downloadBtn').addEventListener('click', generateExcel);
+        
+        // Auto trigger
+        setTimeout(generateExcel, 500);
+    </script>
+</body>
+</html>

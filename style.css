@@ -1,0 +1,58 @@
+body {
+    font-family: 'KaiTi', 'STKaiti', '楷体', serif;
+    background-color: #F3D8C3; /* Soft cream pink background */
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    background: transparent;
+}
+
+.hand-drawn-border {
+    border: 2px solid rgba(96,144,184,0.5); /* theme-blue */
+    /* 不规则的圆角模拟手绘边框 */
+    border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+    padding: 1rem;
+    box-shadow: 2px 2px 8px rgba(96,144,184,0.1);
+}
+
+.hand-drawn-btn {
+    border: 2px solid rgba(96,144,184,0.5); /* theme-blue */
+    border-radius: 10px 20px 10px 20px/20px 10px 20px 10px;
+    background-color: #FFFFFF; /* white */
+    transition: all 0.2s ease;
+    color: #6090B8; /* theme-blue */
+}
+
+.hand-drawn-btn:active {
+    transform: scale(0.95);
+}
+
+.hand-drawn-btn.active {
+    background-color: #F3D8C3; /* theme-pink */
+    font-weight: bold;
+    border-color: #6090B8; /* theme-blue */
+    box-shadow: inset 1px 1px 3px rgba(96,144,184,0.15);
+}
+
+/* 动画效果 */
+@keyframes slide-up {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+.animate-slide-up {
+    animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.snap-x {
+    scroll-snap-type: x mandatory;
+}
+.snap-start {
+    scroll-snap-align: start;
+}
